@@ -13,6 +13,7 @@ namespace BigAmbitionsMP
     {
         public string DirectoryPath = "";
         public bool DiscordUploadQueued;
+        public string DiscordStatus = "";
     }
 
     public static class MPBugReport
@@ -21,6 +22,12 @@ namespace BigAmbitionsMP
         private const long MaxUserAttachmentBytes = 24L * 1024L * 1024L;
         private static string _markerPath = "";
         private static string _pendingCrashSummary = "";
+
+        private sealed class DiscordUploadPlan
+        {
+            public bool ShouldUpload;
+            public string Status = "";
+        }
 
         public static bool PendingCrashDetected { get; private set; }
         public static string PendingCrashSummary => _pendingCrashSummary;
@@ -102,16 +109,35 @@ namespace BigAmbitionsMP
 
             var result = new BugReportResult { DirectoryPath = dir };
             string webhook = MPConfig.BugReportDiscordWebhookUrlLive();
-            if (!string.IsNullOrWhiteSpace(webhook))
+            string[] tags = CleanDiscordTagIds(discordTagIds);
+            var discordPlan = BuildDiscordUploadPlan(webhook, tags);
+            result.DiscordStatus = discordPlan.Status;
+            WriteDiscordStatus(dir, result.DiscordStatus);
+            if (discordPlan.ShouldUpload)
             {
                 result.DiscordUploadQueued = true;
-                string[] tags = CleanDiscordTagIds(discordTagIds);
                 Task.Run(() => UploadToDiscord(webhook, dir, reason, tags));
             }
 
-            Plugin.Logger.LogInfo($"[BugReport] Created report at {dir}");
+            Plugin.Logger.LogInfo($"[BugReport] Created report at {dir}. {result.DiscordStatus}");
             if (openFolder) TryOpenFolder(dir);
             return result;
+        }
+
+        public static string DiscordConfigurationStatus(IEnumerable<string>? discordTagIds = null)
+        {
+            return BuildDiscordUploadPlan(MPConfig.BugReportDiscordWebhookUrlLive(), CleanDiscordTagIds(discordTagIds)).Status;
+        }
+
+        private static DiscordUploadPlan BuildDiscordUploadPlan(string webhook, string[] discordTagIds)
+        {
+            if (string.IsNullOrWhiteSpace(webhook))
+                return new DiscordUploadPlan { Status = "Discord upload skipped: webhook is not configured." };
+            if (!LooksLikeDiscordWebhook(webhook))
+                return new DiscordUploadPlan { Status = "Discord upload skipped: webhook URL is invalid." };
+            if (MPConfig.BugReportDiscordRequiresTagsLive() && discordTagIds.Length == 0)
+                return new DiscordUploadPlan { Status = "Discord upload skipped: no Discord forum tag is configured or selected." };
+            return new DiscordUploadPlan { ShouldUpload = true, Status = "Discord upload queued." };
         }
 
         private static string SafeRoot()
@@ -386,6 +412,17 @@ namespace BigAmbitionsMP
                 "If Discord upload is configured, this report was also queued for webhook upload.\r\n");
         }
 
+        private static void WriteDiscordStatus(string dir, string status)
+        {
+            try
+            {
+                File.WriteAllText(
+                    Path.Combine(dir, "discord-upload-status.txt"),
+                    $"{DateTime.Now:O} {status}\r\n");
+            }
+            catch { }
+        }
+
         private static void TryOpenFolder(string dir)
         {
             try
@@ -442,10 +479,13 @@ namespace BigAmbitionsMP
 
                 using var resp = (HttpWebResponse)req.GetResponse();
                 Plugin.Logger.LogInfo($"[BugReport] Discord upload completed: {(int)resp.StatusCode} {resp.StatusCode}");
+                WriteDiscordStatus(dir, $"Discord upload completed: {(int)resp.StatusCode} {resp.StatusCode}.");
             }
             catch (Exception ex)
             {
-                Plugin.Logger.LogWarning($"[BugReport] Discord upload failed: {DiscordError(ex)}");
+                string error = DiscordError(ex);
+                Plugin.Logger.LogWarning($"[BugReport] Discord upload failed: {error}");
+                WriteDiscordStatus(dir, "Discord upload failed: " + error);
             }
         }
 

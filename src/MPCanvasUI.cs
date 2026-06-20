@@ -4190,9 +4190,7 @@ namespace BigAmbitionsMP
                 string attach = _crashReportAttachments.Count == 0
                     ? "Optional: click 'Attach files' to add screenshots/videos. Your logs are always included."
                     : $"{_crashReportAttachments.Count} file(s) attached. Files over 24 MB are skipped.";
-                _crashReportStatusLbl.text = (MPConfig.BugReportDiscordWebhookUrlLive().Length > 0
-                    ? "Uploads description, Player logs, bamp-ring.log and attachments. "
-                    : "Discord upload is not configured. A local report folder will be saved. ") + attach;
+                _crashReportStatusLbl.text = MPBugReport.DiscordConfigurationStatus(SelectedDiscordForumTagIds()) + " " + attach;
             }
         }
 
@@ -4202,8 +4200,11 @@ namespace BigAmbitionsMP
             {
                 if (_crashReportInputField != null) _crashReportMessage = _crashReportInputField.text ?? "";
                 string prefix = _crashReportIsCrash ? "previous crash: " : "manual bug report: ";
-                MPBugReport.Create(prefix + _crashReportMessage, openFolder: false, attachments: _crashReportAttachments, discordTagIds: SelectedDiscordForumTagIds());
+                var report = MPBugReport.Create(prefix + _crashReportMessage, openFolder: false, attachments: _crashReportAttachments, discordTagIds: SelectedDiscordForumTagIds());
                 if (_crashReportIsCrash) MPBugReport.AcknowledgePendingCrash();
+                MPChat.AddNotice(report.DiscordUploadQueued
+                    ? "bug report saved and Discord upload queued"
+                    : "bug report saved locally: " + report.DiscordStatus);
                 _crashReportPopupVisible = false;
                 if (_crashReportGO != null) _crashReportGO.SetActive(false);
             }
@@ -4885,7 +4886,7 @@ namespace BigAmbitionsMP
                     var report = MPBugReport.Create(reason, discordTagIds: DefaultBugDiscordForumTagIds());
                     string msg = report.DiscordUploadQueued
                         ? "bug report saved and Discord upload queued"
-                        : "bug report saved";
+                        : "bug report saved locally: " + report.DiscordStatus;
                     MPChat.AddNotice($"{msg}: {report.DirectoryPath}");
                 }
                 catch (Exception ex)

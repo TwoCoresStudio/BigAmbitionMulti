@@ -20,6 +20,12 @@ namespace BigAmbitionsMP
             public string Id = "";
         }
 
+        public const string BugReportDiscordWebhookUrlKey = "BugReportDiscordWebhookUrl";
+        public const string BugReportDiscordCrashTagIdKey = "BugReportDiscordCrashTagId";
+        public const string BugReportDiscordBugTagsKey = "BugReportDiscordBugTags";
+        public const string BugReportDiscordRequiresTagsKey = "BugReportDiscordRequiresTags";
+        public const string AllowBugReportCrashTestKey = "AllowBugReportCrashTest";
+
         public static string PlayerId { get; private set; } = "Player1";
         public static string HostIP   { get; private set; } = "127.0.0.1";
         public static int    Port     { get; private set; } = 7777;
@@ -91,8 +97,14 @@ namespace BigAmbitionsMP
         private static void Set(string key, string value)
         {
             _cfg[key] = value;
-            try { File.WriteAllText(_cfgPath, JsonConvert.SerializeObject(_cfg, Formatting.Indented)); }
+            try { SaveConfig(); }
             catch (Exception ex) { Plugin.Logger.LogWarning($"[Config] save: {ex.Message}"); }
+        }
+
+        private static void SaveConfig()
+        {
+            if (string.IsNullOrWhiteSpace(_cfgPath)) return;
+            File.WriteAllText(_cfgPath, JsonConvert.SerializeObject(_cfg, Formatting.Indented));
         }
 
         /// <summary>Host-controlled minutes between coordinated MP autosaves.
@@ -113,14 +125,14 @@ namespace BigAmbitionsMP
         {
             try
             {
-                return GetLiveString("BugReportDiscordWebhookUrl").Trim();
+                return GetLiveString(BugReportDiscordWebhookUrlKey).Trim();
             }
             catch { return ""; }
         }
 
         public static string BugReportDiscordCrashTagIdLive()
         {
-            try { return CleanDiscordTagId(GetLiveString("BugReportDiscordCrashTagId")); }
+            try { return CleanDiscordTagId(GetLiveString(BugReportDiscordCrashTagIdKey)); }
             catch { return ""; }
         }
 
@@ -129,7 +141,7 @@ namespace BigAmbitionsMP
             var tags = new List<BugReportDiscordTag>();
             try
             {
-                string raw = GetLiveString("BugReportDiscordBugTags");
+                string raw = GetLiveString(BugReportDiscordBugTagsKey);
                 if (string.IsNullOrWhiteSpace(raw)) return tags;
 
                 foreach (var part in raw.Split(new[] { ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
@@ -165,12 +177,25 @@ namespace BigAmbitionsMP
         {
             try
             {
-                string v = GetLiveString("AllowBugReportCrashTest");
+                string v = GetLiveString(AllowBugReportCrashTestKey);
                 return v.Equals("true", StringComparison.OrdinalIgnoreCase)
                        || v.Equals("1", StringComparison.OrdinalIgnoreCase)
                        || v.Equals("yes", StringComparison.OrdinalIgnoreCase);
             }
             catch { return false; }
+        }
+
+        public static bool BugReportDiscordRequiresTagsLive()
+        {
+            try
+            {
+                string v = GetLiveString(BugReportDiscordRequiresTagsKey);
+                if (string.IsNullOrWhiteSpace(v)) return true;
+                return v.Equals("true", StringComparison.OrdinalIgnoreCase)
+                       || v.Equals("1", StringComparison.OrdinalIgnoreCase)
+                       || v.Equals("yes", StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return true; }
         }
 
         private static string GetLiveString(string key)
@@ -238,6 +263,7 @@ namespace BigAmbitionsMP
                 Plugin.Logger.LogWarning($"[Config] load: {ex.Message}");
                 _cfg = new Dictionary<string, string>();
             }
+            EnsureDefaultKeys();
 
             HostIP = Get("HostIP", "127.0.0.1");
             Port   = int.TryParse(Get("Port", "7777"), out var p) ? p : 7777;
@@ -268,6 +294,27 @@ namespace BigAmbitionsMP
                 PlayerId = stored;
                 Plugin.Logger.LogInfo($"[Config] Using configured player name: {PlayerId}");
             }
+        }
+
+        private static void EnsureDefaultKeys()
+        {
+            bool dirty = false;
+            dirty |= EnsureKey(BugReportDiscordWebhookUrlKey, "");
+            dirty |= EnsureKey(BugReportDiscordCrashTagIdKey, "");
+            dirty |= EnsureKey(BugReportDiscordBugTagsKey, "");
+            dirty |= EnsureKey(BugReportDiscordRequiresTagsKey, "true");
+            dirty |= EnsureKey(AllowBugReportCrashTestKey, "false");
+            if (!dirty) return;
+
+            try { SaveConfig(); }
+            catch (Exception ex) { Plugin.Logger.LogWarning($"[Config] save defaults: {ex.Message}"); }
+        }
+
+        private static bool EnsureKey(string key, string value)
+        {
+            if (_cfg.ContainsKey(key)) return false;
+            _cfg[key] = value;
+            return true;
         }
 
         /// <summary>Called by the UI when the user clicks Host or Join.

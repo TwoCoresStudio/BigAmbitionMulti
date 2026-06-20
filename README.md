@@ -46,6 +46,12 @@ This beta exists to find bugs, so please report them. The easiest way is in-game
   %USERPROFILE%\AppData\LocalLow\Hovgaard Games\Big Ambitions\Player.log
   ```
 
+Maintainers can enable Discord forum uploads locally by editing the generated
+`BigAmbitionsMP.cfg.<install>.json` in the mod folder. The webhook is deliberately
+not committed to Git. Set `BugReportDiscordWebhookUrl`, `BugReportDiscordCrashTagId`,
+and `BugReportDiscordBugTags` (`Label=tagId;Other=tagId`). If the forum requires
+tags, leave `BugReportDiscordRequiresTags` set to `true`.
+
 ## Building from source
 
 Requires the .NET SDK and a local Big Ambitions install (the project references the game's own assemblies). Build the shipping mod with `dotnet build -c Release`; run `package.ps1` to produce a distributable zip. A `dotnet build -c Dev` build re-enables developer/diagnostic tooling that the shipped build leaves out.
