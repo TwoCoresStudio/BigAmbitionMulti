@@ -4420,12 +4420,18 @@ namespace BigAmbitionsMP
             var reportImg = reportGO.AddComponent<Image>();
             reportImg.color = new Color(0.45f, 0.25f, 0.24f, 1f);
             if (_panelSprite != null) { try { reportImg.sprite = _panelSprite; reportImg.type = Image.Type.Sliced; } catch { } }
+            var reportBtn = reportGO.AddComponent<Button>();
+            reportBtn.targetGraphic = reportImg;
+            reportBtn.interactable = true;
+            reportBtn.transition = Selectable.Transition.None;
+            reportBtn.onClick.AddListener(OpenManualBugReport);
             var reportLbl = MakeLabel(reportGO.transform, "Report", 11, C_WHITE, 0f, 0f, 58f, 20f, TextAlignmentOptions.Center);
             var reportLblRT = reportLbl.rectTransform;
             reportLblRT.anchorMin = Vector2.zero;
             reportLblRT.anchorMax = Vector2.one;
             reportLblRT.offsetMin = Vector2.zero;
             reportLblRT.offsetMax = Vector2.zero;
+            reportLbl.raycastTarget = false;
             ApplyFont(reportLbl);
 
             // Opacity slider — lives IN the title bar (right side, before [X])
